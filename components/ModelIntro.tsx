@@ -1,5 +1,6 @@
 "use client";
 
+import { Github } from "lucide-react";
 import Link from "next/link";
 
 export function ModelIntro() {
@@ -44,8 +45,16 @@ export function ModelIntro() {
         >
           Serverless API
         </Link>
+        <Link
+          href="https://github.com/context-labs/cliptagger-playground?tab=readme-ov-file#how-it-works"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 hover:bg-accent"
+        >
+          <Github className="size-3" />
+          GitHub
+        </Link>
       </div>
     </div>
   );
 }
-
