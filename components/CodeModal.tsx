@@ -5,7 +5,7 @@ import * as Tabs from "@radix-ui/react-tabs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Copy, ExternalLink } from "lucide-react";
 import hljs from "highlight.js";
-import "highlight.js/styles/github.css";
+// Theme CSS now imported globally in app/layout.tsx
 import { getCurlCode } from "@/lib/code-snippets/curl-code";
 import { getTSCode } from "@/lib/code-snippets/ts-code";
 import { getPythonCode } from "@/lib/code-snippets/python-code";
