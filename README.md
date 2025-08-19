@@ -159,4 +159,4 @@ On platforms like Vercel:
 ---
 
 ## License
-MIT (or your preferred license)
+MIT
