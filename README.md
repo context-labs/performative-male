@@ -1,36 +1,162 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## ClipTagger Demo
 
-## Getting Started
+ClipTagger Demo is a Next.js app that annotates images and video keyframes using the `inference-net/cliptagger-12b` model via the Inference.net Chat Completions API. It lets you:
 
-First, run the development server:
+- Upload a single image for annotation
+- Drop a short video to extract 5 representative frames client‑side and annotate each
+- View strict JSON output with timing/attempt metadata
+- Copy ready‑to‑use API code samples (cURL, TypeScript, Python)
 
+The server route keeps your API key on the server and returns only the model output to the client.
+
+---
+
+## Quickstart
+
+### Prerequisites
+- Node.js 18+ (recommended 20+)
+- A package manager (pnpm, npm, or yarn)
+- Inference.net API key
+
+### 1) Install dependencies
 ```bash
-npm run dev
+pnpm install
 # or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Avoid having multiple lockfiles in the project to prevent install/build warnings. Use a single tool consistently.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 2) Configure environment
+Create a `.env` file in the project root:
+```bash
+INFERENCE_API_KEY=YOUR_API_KEY_HERE
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 3) Run the app
+```bash
+pnpm dev
+# or
+npm run dev
+```
 
-## Learn More
+Visit http://localhost:3000 and try uploading an image or a video.
 
-To learn more about Next.js, take a look at the following resources:
+### 4) Production build
+```bash
+pnpm build && pnpm start
+# or
+npm run build && npm start
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## How it works
 
-## Deploy on Vercel
+- UI: `app/page.tsx` provides the image flow; `components/VideoAnnotator.tsx` extracts 5 frames from a dropped video and invokes the same API per frame.
+- Server: `app/api/annotate/route.ts` calls Inference.net’s Chat Completions endpoint with a strict prompt and returns parsed JSON.
+- Prompts: `lib/prompts.ts` contains the system and user prompts that shape the response.
+- Code samples: `components/CodeModal.tsx` + `lib/code-snippets/*` show how to call the upstream API directly (cURL, TS, Python).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Key model: `inference-net/cliptagger-12b`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## API
+
+### POST /api/annotate
+Accepts a base64 data URL for an image and returns structured JSON.
+
+Request body:
+```json
+{
+  "imageDataUrl": "data:image/png;base64,AAAA..."
+}
+```
+
+Successful response (shape):
+```json
+{
+  "success": true,
+  "result": {
+    "description": "...",
+    "objects": ["..."],
+    "actions": ["..."],
+    "environment": "...",
+    "content_type": "...",
+    "specific_style": "...",
+    "production_quality": "...",
+    "summary": "...",
+    "logos": ["..."]
+  },
+  "usage": {},
+  "upstreamStatus": 200,
+  "attempts": 1,
+  "timings": { "upstreamMs": 0, "totalMs": 0 }
+}
+```
+
+Error response (example):
+```json
+{
+  "error": "Missing INFERENCE_API_KEY server environment variable"
+}
+```
+
+Test locally with cURL:
+```bash
+curl -X POST http://localhost:3000/api/annotate \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "imageDataUrl": "data:image/png;base64,AAAA..."
+  }'
+```
+
+Security note: the server route reads `INFERENCE_API_KEY` from the server environment and never exposes it to the browser.
+
+---
+
+## Direct API usage (optional)
+If you prefer to call Inference.net directly from your own backend, see:
+- `lib/code-snippets/curl-code.ts`
+- `lib/code-snippets/ts-code.ts`
+- `lib/code-snippets/python-code.ts`
+
+These examples target `https://api.inference.net/v1/chat/completions` with the `inference-net/cliptagger-12b` model and a strict JSON response format.
+
+---
+
+## UI notes
+- Image upload accepts JPEG/PNG/WebP/GIF (client limit ~4.5MB).
+- Video workflow extracts 5 uniformly spaced frames client‑side and annotates each independently.
+- Result JSON is syntax‑highlighted and accompanied by timing/attempt metadata.
+
+You can change the number of video frames by editing `NUM_FRAMES` in `components/VideoAnnotator.tsx`.
+
+---
+
+## Tech stack
+- Next.js 15, React 19
+- Tailwind CSS 4
+- Radix UI (Dialog, Tabs)
+- lucide-react icons
+- highlight.js for code/JSON display
+
+---
+
+## Troubleshooting
+- 500 from `/api/annotate`: ensure `INFERENCE_API_KEY` is set server‑side.
+- Install/build warning about multiple lockfiles: use a single package manager and delete extra lockfiles.
+- Slow or inconsistent upstream responses: the server implements basic retries with backoff; try again or check your network/API quota.
+
+---
+
+## Deploy
+On platforms like Vercel:
+1. Set `INFERENCE_API_KEY` in your project’s environment variables.
+2. Deploy as usual; the app uses Node.js runtime for the API route and does not expose your key to the client.
+
+---
+
+## License
+MIT (or your preferred license)
