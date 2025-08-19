@@ -20,6 +20,12 @@ import {
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
 import { CodeModal } from "@/components/CodeModal";
+import VideoAnnotator from "@/components/VideoAnnotator";
+import { Stat } from "@/components/Stat";
+import { ErrorAlert } from "@/components/ErrorAlert";
+import { ApiMetaStats } from "@/components/ApiMetaStats";
+import { JsonResultPanel } from "@/components/JsonResultPanel";
+import { EmptyUploadState } from "@/components/EmptyUploadState";
 
 type ClipTaggerResult = {
   description: string;
@@ -315,48 +321,6 @@ export default function Home() {
     setImageInfo(null);
     resetResult();
   };
-
-  type StatProps = {
-    icon: React.ComponentType<{ className?: string }>;
-    label: string;
-    value: string | number | null | undefined;
-  };
-   const Stat: React.FC<StatProps> = ({ icon: Icon, label, value }) => (
-    <div
-      className={[
-        // Container
-        "group grid grid-cols-[auto,1fr] gap-x-2 rounded-lg border",
-        "border-neutral-200 dark:border-neutral-800",
-        "bg-white dark:bg-neutral-950",
-        "px-2.5 py-1.5 transition-colors",
-        "hover:border-neutral-300 dark:hover:border-neutral-700",
-      ].join(" ")}
-      aria-label={`${label}: ${value ?? "—"}`}
-    >
-      <div
-        className={[
-          "flex size-6 items-center justify-center rounded-md",
-          "bg-neutral-100 dark:bg-neutral-900",
-          "transition-colors group-hover:bg-neutral-50 dark:group-hover:bg-neutral-800",
-        ].join(" ")}
-      >
-        <Icon className="size-3.5 text-neutral-600 dark:text-neutral-400" />
-      </div>
-  
-      {/* Value + label in a 2-col grid so label wraps under itself, not under the icon */}
-      <div className="min-w-0">
-        <div className="grid grid-cols-[auto,1fr] items-baseline gap-x-1.5 gap-y-0.5 text-[13px] leading-tight">
-          <span className="shrink-0 font-medium text-neutral-900 dark:text-neutral-100 tabular-nums">
-            {value ?? "—"}
-          </span>
-          <span className="[overflow-wrap:anywhere] break-words text-neutral-500 dark:text-neutral-400">
-            {label}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div ref={containerRef} className="min-h-dvh p-6 sm:p-10">
       <div className="mx-auto max-w-5xl space-y-6">
@@ -371,7 +335,7 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-2">
             <div className="hidden sm:flex text-xs text-muted-foreground gap-2">
-              <div className="rounded-md border px-2 py-1">Max 1MB</div>
+              <div className="rounded-md border px-2 py-1">Max 4.5MB</div>
               <div className="rounded-md border px-2 py-1">
                 JPEG · PNG · WebP · GIF
               </div>
@@ -398,35 +362,12 @@ export default function Home() {
             )}
           >
             {!hasImage ? (
-              <div className="flex flex-col items-center gap-4 text-center">
-                <div className="rounded-full size-14 grid place-items-center border">
-                  <ImagePlus className="size-6" />
-                </div>
-                <div className="space-y-1">
-                  <div className="text-base sm:text-lg font-medium">
-                    Drop an image here
-                  </div>
-                  <div className="text-xs sm:text-sm text-muted-foreground">
-                    or
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  <label className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent cursor-pointer">
-                    <Upload className="size-4" />
-                    <span>Upload</span>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept={`${ACCEPTED_MIME.join(",")},image/*`}
-                      onChange={onFileChange}
-                      className="sr-only"
-                    />
-                  </label>
-                  <div className="text-xs text-muted-foreground">
-                    or press ⌘/Ctrl+V to paste
-                  </div>
-                </div>
-              </div>
+              <EmptyUploadState
+                label="Drop an image here"
+                accept={`${ACCEPTED_MIME.join(",")},image/*`}
+                onChange={onFileChange}
+                helper="or press ⌘/Ctrl+V to paste"
+              />
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                 <div className="space-y-3">
@@ -511,74 +452,18 @@ export default function Home() {
                 </div>
 
                 <div className="space-y-3">
-                  {error && (
-                    <div className="rounded-lg border bg-destructive/10 text-destructive p-3 text-sm flex items-start gap-2">
-                      <AlertTriangle className="size-4 mt-0.5" />
-                      <div>{error}</div>
-                    </div>
-                  )}
+                  {error && <ErrorAlert message={error} />}
 
-                  {apiMeta && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      <Stat
-                        icon={Timer}
-                        label="Upstream"
-                        value={`${apiMeta.upstreamMs} ms`}
-                      />
-                      <Stat
-                        icon={Timer}
-                        label="Server total"
-                        value={`${apiMeta.totalMs} ms`}
-                      />
-                      <Stat
-                        icon={Timer}
-                        label="Client"
-                        value={`${apiMeta.clientMs} ms`}
-                      />
-                      <Stat
-                        icon={Activity}
-                        label="Attempts"
-                        value={apiMeta.attempts}
-                      />
-                      <Stat
-                        icon={BarChart3}
-                        label="Upstream status"
-                        value={apiMeta.upstreamStatus ?? "-"}
-                      />
-                    </div>
-                  )}
+                  {apiMeta && <ApiMetaStats meta={{
+                    attempts: apiMeta.attempts,
+                    upstreamMs: apiMeta.upstreamMs,
+                    totalMs: apiMeta.totalMs,
+                    upstreamStatus: apiMeta.upstreamStatus,
+                    clientMs: apiMeta.clientMs,
+                  }} />}
 
                   {result ? (
-                    <div className="rounded-lg border overflow-hidden">
-                      <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/50">
-                        <div className="text-sm font-medium">Result JSON</div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={copyJson}
-                            className="inline-flex items-center gap-1 text-xs rounded-md border px-2 py-1 hover:bg-accent"
-                          >
-                            <Copy className="size-3" /> Copy
-                          </button>
-                          <button
-                            onClick={downloadJson}
-                            className="inline-flex items-center gap-1 text-xs rounded-md border px-2 py-1 hover:bg-accent"
-                          >
-                            <Download className="size-3" /> Download
-                          </button>
-                          <button
-                            onClick={() => setCodeOpen(true)}
-                            className="inline-flex items-center gap-1 text-xs rounded-md border px-2 py-1 hover:bg-accent"
-                          >
-                            <Code2 className="size-3" /> Code
-                          </button>
-                        </div>
-                      </div>
-                      <pre className="p-3 whitespace-pre-wrap break-words text-xs leading-5 bg-card">
-                        <code ref={resultCodeRef} className="language-json">
-                          {JSON.stringify(result, null, 2)}
-                        </code>
-                      </pre>
-                    </div>
+                    <JsonResultPanel codeRef={resultCodeRef as unknown as React.RefObject<HTMLElement>} json={result} />
                   ) : (
                     <div className="rounded-lg border p-4 text-sm text-muted-foreground">
                       {annotating ? (
@@ -594,6 +479,15 @@ export default function Home() {
                 </div>
               </div>
             )}
+          </div>
+        </section>
+
+        <section>
+          <div className="mt-6">
+            <h2 className="text-lg font-semibold mb-2">
+              Video (5-frame) Annotator
+            </h2>
+            <VideoAnnotator />
           </div>
         </section>
 
