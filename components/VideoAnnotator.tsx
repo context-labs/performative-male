@@ -2,8 +2,12 @@
 
 import { useCallback, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Upload, Loader2, Wand2, RotateCcw, Trash2, ImagePlus, Timer, BarChart3, AlertTriangle } from "lucide-react";
+import { Loader2, Wand2, RotateCcw, Trash2, Timer, BarChart3, AlertTriangle } from "lucide-react";
 import { Stat } from "@/components/Stat";
+import { ErrorAlert } from "@/components/ErrorAlert";
+// import { ApiMetaStats } from "@/components/ApiMetaStats";
+import { JsonResultPanel } from "@/components/JsonResultPanel";
+import { EmptyUploadState } from "@/components/EmptyUploadState";
 
 type ClipTaggerResult = {
   description: string;
@@ -285,29 +289,12 @@ export default function VideoAnnotator() {
         )}
       >
         {!videoFile ? (
-          <div className="flex flex-col items-center gap-4 text-center">
-            <div className="rounded-full size-14 grid place-items-center border">
-              <ImagePlus className="size-6" />
-            </div>
-            <div className="space-y-1">
-              <div className="text-base sm:text-lg font-medium">Drop a video here</div>
-              <div className="text-xs sm:text-sm text-muted-foreground">or</div>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <label className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent cursor-pointer">
-                <Upload className="size-4" />
-                <span>Upload video</span>
-                <input ref={videoInputRef} type="file" accept="video/*" onChange={onFileChange} className="sr-only" />
-              </label>
-              <div className="text-xs text-muted-foreground">MP4 · WebM · MOV</div>
-            </div>
-            {error && (
-              <div className="rounded-lg border bg-destructive/10 text-destructive p-3 text-sm flex items-start gap-2">
-                <AlertTriangle className="size-4 mt-0.5" />
-                <div>{error}</div>
-              </div>
-            )}
-          </div>
+          <EmptyUploadState
+            label="Drop a video here"
+            accept="video/*"
+            onChange={onFileChange}
+            helper="MP4 · WebM · MOV"
+          />
         ) : (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
@@ -355,12 +342,7 @@ export default function VideoAnnotator() {
                   </button>
                 </div>
 
-                {error && (
-                  <div className="rounded-lg border bg-destructive/10 text-destructive p-3 text-sm flex items-start gap-2">
-                    <AlertTriangle className="size-4 mt-0.5" />
-                    <div>{error}</div>
-                  </div>
-                )}
+                {error && <ErrorAlert message={error} />}
 
                 {outcomes ? (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -382,9 +364,7 @@ export default function VideoAnnotator() {
                             </div>
 
                             {o.ok ? (
-                              <pre className="p-3 whitespace-pre-wrap break-words text-xs leading-5 bg-card">
-                                <code className="language-json">{JSON.stringify(o.result, null, 2)}</code>
-                              </pre>
+                              <JsonResultPanel json={o.result} header={`Frame ${o.index + 1} JSON`} />
                             ) : (
                               <div className="rounded-lg border bg-destructive/10 text-destructive p-3 text-sm flex items-start gap-2">
                                 <AlertTriangle className="size-4 mt-0.5" />

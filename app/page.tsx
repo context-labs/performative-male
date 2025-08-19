@@ -2,23 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import {
-  Activity,
-  BarChart3,
-  Copy,
-  Download,
-  ImagePlus,
-  Loader2,
-  Timer,
-  Trash2,
-  Upload,
-  Wand2,
-  RotateCcw,
-  AlertTriangle,
-  Code2,
-} from "lucide-react";
-import hljs from "highlight.js";
-import "highlight.js/styles/github.css";
+import { Activity, BarChart3, Loader2, Trash2, Wand2, RotateCcw, Code2 } from "lucide-react";
 import { CodeModal } from "@/components/CodeModal";
 import VideoAnnotator from "@/components/VideoAnnotator";
 import { Stat } from "@/components/Stat";
@@ -86,8 +70,7 @@ export default function Home() {
   const [dragActive, setDragActive] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [codeOpen, setCodeOpen] = useState(false);
-  const codeRef = useRef<HTMLElement>(null);
-  const resultCodeRef = useRef<HTMLElement>(null);
+  // Removed separate codeRef; highlighting handled in JsonResultPanel
 
   const hasImage = Boolean(imageDataUrl);
 
@@ -198,11 +181,11 @@ export default function Home() {
   );
 
   useEffect(() => {
-    const el = containerRef.current ?? window;
     const handler = (e: ClipboardEvent) => onPaste(e);
-    el.addEventListener("paste", handler as unknown as EventListener);
+    // Listen at window-level and in capture phase so paste works anywhere on the page
+    window.addEventListener("paste", handler as unknown as EventListener, true);
     return () => {
-      el.removeEventListener("paste", handler as unknown as EventListener);
+      window.removeEventListener("paste", handler as unknown as EventListener, true);
     };
   }, [onPaste]);
 
@@ -275,44 +258,9 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    if (codeOpen) {
-      requestAnimationFrame(() => {
-        codeRef.current
-          ?.querySelectorAll("pre code")
-          .forEach((el) => hljs.highlightElement(el as HTMLElement));
-      });
-    }
-  }, [codeOpen]);
+  // Syntax highlighting now handled by JsonResultPanel
 
-  useEffect(() => {
-    if (!result) return;
-    requestAnimationFrame(() => {
-      if (resultCodeRef.current) {
-        hljs.highlightElement(resultCodeRef.current);
-      }
-    });
-  }, [result]);
-
-  const copyJson = async () => {
-    if (!result) return;
-    const text = JSON.stringify(result, null, 2);
-    await navigator.clipboard.writeText(text);
-    setNotice("Copied result JSON to clipboard");
-  };
-
-  const downloadJson = () => {
-    if (!result) return;
-    const blob = new Blob([JSON.stringify(result, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "annotation.json";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  // copy/download are now handled via the dedicated panel if needed
 
   // replace handled by label-wrapped input
   const removeImage = () => {
@@ -463,7 +411,7 @@ export default function Home() {
                   }} />}
 
                   {result ? (
-                    <JsonResultPanel codeRef={resultCodeRef as unknown as React.RefObject<HTMLElement>} json={result} />
+                    <JsonResultPanel json={result} />
                   ) : (
                     <div className="rounded-lg border p-4 text-sm text-muted-foreground">
                       {annotating ? (
