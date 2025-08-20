@@ -11,6 +11,7 @@ import { ApiMetaStats } from "@/components/ApiMetaStats";
 import { JsonResultPanel } from "@/components/JsonResultPanel";
 import { EmptyUploadState } from "@/components/EmptyUploadState";
 import { ModelIntro } from "@/components/ModelIntro";
+import { PartnerBanner } from "@/components/PartnerBanner";
 
 type ClipTaggerResult = {
   description: string;
@@ -297,6 +298,10 @@ export default function Home() {
             </button>
           </div>
         </header>
+
+        <section>
+          <PartnerBanner />
+        </section>
 
         <section>
           <ModelIntro />
