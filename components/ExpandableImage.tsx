@@ -7,9 +7,11 @@ type ExpandableImageProps = {
   src: string;
   alt?: string;
   className?: string;
+  loading?: 'eager' | 'lazy';
+  fetchPriority?: 'high' | 'low' | 'auto';
 };
 
-export function ExpandableImage({ src, alt, className }: ExpandableImageProps) {
+export function ExpandableImage({ src, alt, className, loading, fetchPriority }: ExpandableImageProps) {
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -17,7 +19,8 @@ export function ExpandableImage({ src, alt, className }: ExpandableImageProps) {
         <img
           src={src}
           alt={alt ?? "Preview"}
-          loading="lazy"
+          loading={loading ?? "lazy"}
+          fetchPriority={fetchPriority}
           decoding="async"
           className={cn("cursor-zoom-in", className)}
         />

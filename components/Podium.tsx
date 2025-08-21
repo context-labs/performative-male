@@ -76,6 +76,8 @@ function RankCard({ rank, entry }: RankCardProps) {
         <ExpandableImage
           src={`/img/${entry.imageId}?w=${isFirst ? 1024 : 800}&fmt=webp&q=72`}
           alt={`Rank ${rank} submission`}
+          loading="eager"
+          fetchPriority="high"
           className="h-full w-full object-contain"
         />
 

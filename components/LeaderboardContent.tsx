@@ -89,7 +89,7 @@ export default async function LeaderboardContent() {
               <div key={e.id} className="flex items-center gap-3 p-3">
                 <div className="text-xs w-8 text-muted-foreground">#{i + 1}</div>
                 <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-black/5">
-                  <ExpandableImage src={`/img/${e.imageId}?w=256&fmt=webp&q=70`} alt={`Entry ${e.id}`} className="h-full w-full object-cover" />
+                  <ExpandableImage src={`/img/${e.imageId}?w=256&fmt=webp&q=70`} alt={`Entry ${e.id}`} loading={i < 6 ? 'eager' : 'lazy'} fetchPriority={i < 6 ? 'high' : 'auto'} className="h-full w-full object-cover" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium">{e.score}/10</div>
@@ -131,6 +131,8 @@ export default async function LeaderboardContent() {
                           <ExpandableImage
                             src={`/img/${e.imageId}?w=128&fmt=webp&q=70`}
                             alt={`Entry ${e.id}`}
+                            loading={i < 6 ? 'eager' : 'lazy'}
+                            fetchPriority={i < 6 ? 'high' : 'auto'}
                             className="h-14 w-14 rounded-md object-cover"
                           />
                         </div>

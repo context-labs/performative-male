@@ -1,20 +1,26 @@
 export const dynamic = 'force-dynamic';
 
+import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 import { Suspense } from 'react';
+
 import LeaderboardContent from '@/components/LeaderboardContent';
 export default function LeaderboardPage() {
   return (
     <div className="min-h-dvh p-6 sm:p-10">
       <div className="mx-auto max-w-6xl space-y-8">
-        {/* Top partner banner (sticky, ultra-subtle, hidden on mobile) */}
-        <div className="hidden md:block sticky top-0 z-30 bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/40 border-b">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/grass-inference-logs.png" alt="Grass × Inference" className="h-16 w-full object-cover" />
-        </div>
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Leaderboard</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Top submissions ranked by performativity score.</p>
+        <div>
+          <div className="mb-4">
+            <Link href="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Home
+            </Link>
+          </div>
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Leaderboard</h1>
+              <p className="mt-1 text-sm text-muted-foreground">Top submissions ranked by performativity score.</p>
+            </div>
           </div>
         </div>
         <Suspense fallback={
