@@ -74,7 +74,8 @@ export async function GET(request: NextRequest) {
     // ignore invalid dates
   }
 
-  const blob = new Blob([buffer], { type: mime });
+  const bytes = new Uint8Array(buffer);
+  const blob = new Blob([bytes], { type: mime });
   return new NextResponse(blob, { status: 200, headers });
 }
 
