@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
   const rows = await db
     .select({
       id: entriesTable.id,
+      imageHash: entriesTable.imageHash,
       score: entriesTable.score,
       matchedKeywords: entriesTable.matchedKeywords,
       createdAt: entriesTable.createdAt,
@@ -59,13 +60,15 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     success: true,
     entries: rows.map((r) => ({
-      ...r,
+      id: r.id,
       imageId: r.id,
+      imageHash: r.imageHash ?? null,
       matchedKeywords: r.matchedKeywords?.split(',').filter(Boolean) ?? [],
       createdAt: r.createdAt?.toISOString?.() ?? new Date().toISOString(),
       socialPlatform: r.socialPlatform ?? null,
       socialUrl: r.socialUrl ?? null,
       podiumOptIn: Boolean(r.podiumOptIn),
+      score: r.score,
     })),
   });
 }

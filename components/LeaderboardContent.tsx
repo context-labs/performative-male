@@ -8,6 +8,7 @@ import { unstable_cache } from "next/cache";
 type Entry = {
   id: number;
   imageId: number;
+  imageHash?: string | null;
   score: number;
   matchedKeywords: string[];
   createdAt: string;
@@ -18,6 +19,7 @@ type Entry = {
 
 type EntryMeta = {
   id: number;
+  imageHash?: string | null;
   score: number;
   matchedKeywords: string[];
   createdAt: string;
@@ -30,6 +32,7 @@ const getTopEntryMetas = unstable_cache(async (): Promise<EntryMeta[]> => {
   const rows = await db
     .select({
       id: entriesTable.id,
+      imageHash: entriesTable.imageHash,
       score: entriesTable.score,
       matchedKeywords: entriesTable.matchedKeywords,
       createdAt: entriesTable.createdAt,
@@ -50,6 +53,7 @@ const getTopEntryMetas = unstable_cache(async (): Promise<EntryMeta[]> => {
 
   return rows.map((r) => ({
     id: r.id!,
+    imageHash: (r as { imageHash?: string | null }).imageHash ?? null,
     score: r.score!,
     matchedKeywords: (r.matchedKeywords ?? '').split(',').filter(Boolean),
     createdAt: r.createdAt?.toISOString?.() ?? new Date().toISOString(),
@@ -66,6 +70,7 @@ export default async function LeaderboardContent() {
   const entries: Entry[] = metas.map((m) => ({
     id: m.id,
     imageId: m.id,
+    imageHash: m.imageHash ?? null,
     score: m.score,
     matchedKeywords: m.matchedKeywords,
     createdAt: m.createdAt,
@@ -89,7 +94,7 @@ export default async function LeaderboardContent() {
               <div key={e.id} className="flex items-center gap-3 p-3">
                 <div className="text-xs w-8 text-muted-foreground">#{i + 1}</div>
                 <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-black/5">
-                  <ExpandableImage src={`/img/${e.imageId}?w=256&fmt=webp&q=70`} alt={`Entry ${e.id}`} loading={i < 6 ? 'eager' : 'lazy'} fetchPriority={i < 6 ? 'high' : 'auto'} className="h-full w-full object-cover" />
+                  <ExpandableImage src={`/img/${e.imageId}/${e.imageHash ?? 'x'}?w=256&fmt=webp&q=70`} alt={`Entry ${e.id}`} loading={i < 6 ? 'eager' : 'lazy'} fetchPriority={i < 6 ? 'high' : 'auto'} className="h-full w-full object-cover" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium">{e.score}/10</div>
@@ -129,7 +134,7 @@ export default async function LeaderboardContent() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <ExpandableImage
-                            src={`/img/${e.imageId}?w=128&fmt=webp&q=70`}
+                            src={`/img/${e.imageId}/${e.imageHash ?? 'x'}?w=128&fmt=webp&q=70`}
                             alt={`Entry ${e.id}`}
                             loading={i < 6 ? 'eager' : 'lazy'}
                             fetchPriority={i < 6 ? 'high' : 'auto'}

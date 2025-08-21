@@ -9,6 +9,7 @@ import { ArrowLeft } from "lucide-react";
 type Entry = {
   id: number;
   imageId: number;
+  imageHash?: string | null;
   score: number;
   matchedKeywords: string[];
   createdAt: string;
@@ -19,6 +20,7 @@ type ApiResponse = {
   entries: Array<{
     id: number;
     imageId: number;
+    imageHash?: string | null;
     score: number;
     matchedKeywords: string[] | string | null;
     createdAt: string;
@@ -61,6 +63,7 @@ export function LeaderboardClient({ initial }: { initial: Entry[] }) {
         const list: Entry[] = json.entries.map((r) => ({
           id: r.id,
           imageId: r.imageId,
+          imageHash: r.imageHash ?? null,
           score: r.score,
           matchedKeywords: Array.isArray(r.matchedKeywords)
             ? r.matchedKeywords
@@ -147,7 +150,7 @@ export function LeaderboardClient({ initial }: { initial: Entry[] }) {
           {entries.map((e, i) => (
             <article key={e.id} className="rounded-lg border">
               <div className="relative h-52 sm:h-60 overflow-hidden rounded-t-lg bg-muted">
-                <ExpandableImage src={`/img/${e.imageId}?w=640&fmt=webp&q=72`} alt={`Entry ${e.id}`} loading={i < 6 ? 'eager' : 'lazy'} fetchPriority={i < 6 ? 'high' : 'auto'} className="h-full w-full object-contain" />
+                <ExpandableImage src={`/img/${e.imageId}/${e.imageHash ?? 'x'}?w=640&fmt=webp&q=72`} alt={`Entry ${e.id}`} loading={i < 6 ? 'eager' : 'lazy'} fetchPriority={i < 6 ? 'high' : 'auto'} className="h-full w-full object-contain" />
                 <div className="absolute left-2 top-2 inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium">#{i + 1}</div>
                 <div className={cn("absolute right-2 top-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", scorePillClass(e.score))}>{e.score}/10</div>
               </div>

@@ -13,11 +13,11 @@ export const metadata: Metadata = {
     title: "Performative Male Detector: An AI Vibe Check",
     description:
       "Is he trying too hard? Upload a photo and our AI will score his performativity. Tote bags, iced coffee, and ironic t-shirts welcome.",
-    url: "https://cliptagger.inference.net",
+    url: "https://performative.inference.net",
     siteName: "Performative Male Detector",
     images: [
       {
-        url: "https://cliptagger.inference.net/og.png",
+        url: "https://performative.inference.net/og.png",
         width: 1200,
         height: 630,
         alt: "An AI-powered detector to rate performative males.",
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
       "Is he trying too hard? Upload a photo and our AI will score his performativity. Tote bags, iced coffee, and ironic t-shirts welcome.",
     images: ["https://cliptagger.inference.net/og.png"],
   },
-  metadataBase: new URL("https://cliptagger.inference.net"),
+  metadataBase: new URL("https://performative.inference.net"),
 };
 
 const geistSans = Geist({
