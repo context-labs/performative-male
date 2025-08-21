@@ -469,6 +469,18 @@ export default function Home() {
 
         {/* Removed secondary banner to avoid duplication */}
 
+        {/* Featured image (subtle, responsive) */}
+        <div className="mb-4 rounded-lg border bg-muted/30 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/male.png"
+            alt="Illustration"
+            loading="lazy"
+            decoding="async"
+            className="block w-full max-h-40 sm:max-h-56 object-contain pointer-events-none select-none"
+          />
+        </div>
+
         <section>
           <div
             onDrop={onDrop}
