@@ -15,11 +15,12 @@ export function PartnerBanner() {
       <div className="relative overflow-hidden rounded-lg border bg-background">
         <div className="relative w-full h-12 sm:h-14 md:h-16 lg:h-20">
           <Image
-            src="/grass-inference-logs.png"
+            src="/grass-inference-logos.png"
             alt="Grass × Inference"
             fill
             sizes="100vw"
             quality={100}
+            unoptimized={true}
             className="object-cover"
           />
         </div>
