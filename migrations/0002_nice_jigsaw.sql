@@ -1,0 +1,1 @@
+ALTER TABLE "entries" DROP CONSTRAINT "entries_image_data_url_unique";

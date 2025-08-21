@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SYSTEM_PROMPT, USER_PROMPT } from "@/lib/prompts";
+import { db } from "@/src/db";
+import { entriesTable } from "@/src/schema";
+import { eq, or } from "drizzle-orm";
+import crypto from "node:crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,6 +76,48 @@ export async function POST(request: NextRequest) {
   let upstreamStatus: number | null = null;
   let upstreamUsage: unknown = null;
   let parsedResult: ClipTaggerResult | null = null;
+
+  // Dedupe: compute content hash and check DB for a cached result
+  let imageHash: string | null = null;
+  try {
+    const commaIdx = body.imageDataUrl.indexOf(',');
+    const base64Part = commaIdx >= 0 ? body.imageDataUrl.slice(commaIdx + 1) : body.imageDataUrl;
+    const buffer = Buffer.from(base64Part, 'base64');
+    imageHash = crypto.createHash('sha256').update(buffer).digest('hex');
+  } catch {
+    imageHash = null;
+  }
+
+  try {
+    const cached = await db
+      .select({ resultJson: entriesTable.resultJson, createdAt: entriesTable.createdAt })
+      .from(entriesTable)
+      .where(
+        imageHash
+          ? or(eq(entriesTable.imageHash, imageHash), eq(entriesTable.imageDataUrl, body.imageDataUrl))
+          : eq(entriesTable.imageDataUrl, body.imageDataUrl)
+      )
+      .limit(1);
+    if (cached.length > 0) {
+      try {
+        parsedResult = JSON.parse(cached[0].resultJson) as ClipTaggerResult;
+      } catch {
+        parsedResult = null;
+      }
+      if (parsedResult) {
+        return NextResponse.json({
+          success: true,
+          result: parsedResult,
+          usage: { cache: true },
+          upstreamStatus: 200,
+          attempts: 0,
+          timings: { upstreamMs: 0, totalMs: Date.now() - startedAt },
+        });
+      }
+    }
+  } catch {
+    // ignore cache errors and proceed to upstream
+  }
 
   while (attempt < maxAttempts) {
     attempt += 1;

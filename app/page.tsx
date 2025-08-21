@@ -1,17 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Activity, BarChart3, Loader2, Trash2, Wand2, RotateCcw, Code2 } from "lucide-react";
-import { CodeModal } from "@/components/CodeModal";
-import VideoAnnotator from "@/components/VideoAnnotator";
-import { Stat } from "@/components/Stat";
+import { Loader2, Trash2, Wand2, RotateCcw, Trophy, AlertCircle } from "lucide-react";
 import { ErrorAlert } from "@/components/ErrorAlert";
-import { ApiMetaStats } from "@/components/ApiMetaStats";
-import { JsonResultPanel } from "@/components/JsonResultPanel";
 import { EmptyUploadState } from "@/components/EmptyUploadState";
-import { ModelIntro } from "@/components/ModelIntro";
 import { PartnerBanner } from "@/components/PartnerBanner";
+import { useForm } from "react-hook-form";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type ClipTaggerResult = {
   description: string;
@@ -51,34 +51,33 @@ export default function Home() {
   const abortRef = useRef<AbortController | null>(null);
 
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
-  const [imageInfo, setImageInfo] = useState<{
-    width: number;
-    height: number;
-    size: number;
-    type: string;
-  } | null>(null);
 
   const [annotating, setAnnotating] = useState(false);
-  const [apiMeta, setApiMeta] = useState<{
-    attempts: number;
-    upstreamMs: number;
-    totalMs: number;
-    upstreamStatus: number | null;
-    usage: unknown;
-    clientMs: number;
-  } | null>(null);
   const [result, setResult] = useState<ClipTaggerResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [codeOpen, setCodeOpen] = useState(false);
-  // Removed separate codeRef; highlighting handled in JsonResultPanel
+  // Removed developer-focused code modal for a simpler experience
+  const [saving, setSaving] = useState(false);
+  const [score, setScore] = useState<number | null>(null);
+  const [matchedKeywords, setMatchedKeywords] = useState<string[]>([]);
+  const [displayedScore, setDisplayedScore] = useState<number>(0);
+  const [onPodium, setOnPodium] = useState<boolean | null>(null);
+  const [podiumMessage, setPodiumMessage] = useState<string | null>(null);
+
+  type FormValues = {
+    socialPlatform: 'twitter' | 'instagram' | 'tiktok' | '';
+    socialHandle: string;
+    podiumOptIn: boolean;
+  };
+  const { register, handleSubmit, setValue, watch } = useForm<FormValues>({
+    defaultValues: { socialPlatform: '', socialHandle: '', podiumOptIn: true },
+  });
 
   const hasImage = Boolean(imageDataUrl);
 
   const resetResult = useCallback(() => {
     setResult(null);
-    setApiMeta(null);
     setError(null);
   }, []);
 
@@ -113,17 +112,7 @@ export default function Home() {
         const dataUrl = await readFileAsDataUrl(file);
         setImageDataUrl(dataUrl);
 
-        // measure dimensions
-        const probe = new Image();
-        probe.onload = () => {
-          setImageInfo({
-            width: probe.width,
-            height: probe.height,
-            size: file.size,
-            type: file.type,
-          });
-        };
-        probe.src = dataUrl;
+        // simplified: skip measuring image details
       } catch {
         setError("Failed to load image");
       }
@@ -190,25 +179,71 @@ export default function Home() {
       window.removeEventListener("paste", handler as unknown as EventListener, true);
     };
   }, [onPaste]);
+  // Animate the visible score when the real score arrives
+  useEffect(() => {
+    if (score == null || saving) {
+      setDisplayedScore(0);
+      return;
+    }
+    let raf = 0;
+    const start = performance.now();
+    const durationMs = 900;
+    const startVal = 0;
+    const endVal = score;
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / durationMs);
+      const eased = easeOutCubic(t);
+      const val = Math.round(startVal + (endVal - startVal) * eased);
+      setDisplayedScore(val);
+      if (t < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [score, saving]);
 
-  const formatBytes = (n?: number | null) => {
-    if (!n && n !== 0) return "-";
-    if (n < 1024) return `${n} B`;
-    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-    return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+  // Cap the gauge at 10; higher scores still display numerically but the visual ring is maxed
+  const scorePercent = score != null ? Math.max(0, Math.min(100, (Math.min(score, 10) / 10) * 100)) : 0;
+  const gaugeColor = score != null && score >= 8
+    ? "rgb(16 185 129)" // emerald-500
+    : score != null && score >= 5
+    ? "rgb(245 158 11)" // amber-500
+    : "rgb(244 63 94)"; // rose-500
+
+  const barFillClass = score != null && score >= 8
+    ? "bg-emerald-500"
+    : score != null && score >= 5
+    ? "bg-amber-500"
+    : "bg-rose-500";
+
+  const scoreLabel = (s: number | null) => {
+    if (s == null) return "";
+    if (s >= 20) return "Mythic performativity";
+    if (s > 10) return "Off the charts";
+    if (s >= 9) return "Elite performativity";
+    if (s >= 7) return "Very performative";
+    if (s >= 4) return "Moderately performative";
+    return "Low performativity";
   };
 
-  const annotate = async () => {
+  const scoreSuffix = (s: number | null) => (s != null && s > 10 ? "/10+" : "/10");
+  const formatScore = (s: number) => `${s}${s > 10 ? "/10+" : "/10"}`;
+
+
+  // removed byte formatter for a simpler UI
+
+  const onSubmit = async (formData: FormValues) => {
     if (!imageDataUrl || annotating) return;
     setError(null);
     setResult(null);
-    setApiMeta(null);
+    setScore(null);
+    setMatchedKeywords([]);
+    setOnPodium(null);
+    setPodiumMessage(null);
     setAnnotating(true);
     revokeAbort();
     const controller = new AbortController();
     abortRef.current = controller;
-
-    const clientStart = Date.now();
     try {
       const resp = await fetch("/api/annotate", {
         method: "POST",
@@ -217,29 +252,109 @@ export default function Home() {
         signal: controller.signal,
       });
       const json = (await resp.json()) as ApiSuccess | ApiError;
-      const clientMs = Date.now() - clientStart;
       if (resp.ok && (json as ApiSuccess).success) {
         const ok = json as ApiSuccess;
         setResult(ok.result);
-        setApiMeta({
-          attempts: ok.attempts,
-          upstreamMs: ok.timings.upstreamMs,
-          totalMs: ok.timings.totalMs,
-          upstreamStatus: ok.upstreamStatus ?? null,
-          usage: ok.usage ?? null,
-          clientMs,
-        });
+        // After successful annotation, submit to leaderboard API
+        try {
+          setSaving(true);
+          const submitResp = await fetch("/api/submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              imageDataUrl,
+              result: ok.result,
+              socialPlatform: formData.socialPlatform || undefined,
+              socialHandle: formData.socialHandle || undefined,
+              podiumOptIn: formData.podiumOptIn,
+            }),
+          });
+          if (submitResp.ok) {
+            const submitJson = (await submitResp.json()) as {
+              success: true;
+              id: number;
+              score: number;
+              matchedKeywords: string[];
+              createdAt: string;
+            };
+            setScore(submitJson.score);
+            setMatchedKeywords(submitJson.matchedKeywords ?? []);
+
+            // Determine podium status and reason
+            try {
+              const isEligibleForLeaderboard = (r: ClipTaggerResult | null | undefined, s: number) => {
+                if (s < 3) return { eligible: false, reason: `Minimum score for the leaderboard is 3. You scored ${s}.` };
+                const pieces: string[] = [];
+                if (r) {
+                  pieces.push(r.description, r.environment, r.summary);
+                  if (Array.isArray(r.objects)) pieces.push(...r.objects);
+                  if (Array.isArray(r.actions)) pieces.push(...r.actions);
+                  if (Array.isArray(r.logos)) pieces.push(...r.logos);
+                }
+                const joined = pieces.join(" ").toLowerCase();
+                const hasMaleSubject = /\b(man|male|guy|boy|gentleman|dude|men|boys|guys|person)\b/i.test(joined);
+                if (!hasMaleSubject) {
+                  return { eligible: false, reason: `Podium is limited to entries tagged as a male subject. Your submission didn’t include a male keyword.` };
+                }
+                return { eligible: true } as const;
+              };
+
+              const eligibility = isEligibleForLeaderboard(ok.result, submitJson.score);
+              if (!eligibility.eligible) {
+                setOnPodium(false);
+                setPodiumMessage(eligibility.reason as string);
+              } else {
+                const lbResp = await fetch("/api/leaderboard", { method: "GET" });
+                if (lbResp.ok) {
+                  const lb = (await lbResp.json()) as { success: true; entries: Array<{ id: number; score: number; createdAt: string }> };
+                  const mine = { id: submitJson.id, score: submitJson.score, createdAt: submitJson.createdAt };
+                  const byId = new Map<number, { id: number; score: number; createdAt: string }>();
+                  for (const e of lb.entries) byId.set(e.id, e);
+                  byId.set(mine.id, mine);
+                  const all = Array.from(byId.values());
+                  all.sort((a, b) => {
+                    if (b.score !== a.score) return b.score - a.score;
+                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                  });
+                  const myIdx = all.findIndex((e) => e.id === mine.id);
+                  const myRank = myIdx >= 0 ? myIdx + 1 : null;
+                  if (myRank != null && myRank <= 3) {
+                    setOnPodium(true);
+                    setPodiumMessage(`You’re on the podium at #${myRank}.`);
+                  } else {
+                    const third = all[2];
+                    if (third) {
+                      const diff = Math.max(0, third.score - mine.score);
+                      setOnPodium(false);
+                      setPodiumMessage(
+                        diff === 0
+                          ? `Podium is currently full at ${formatScore(third.score)}. Newer entries with the same score take priority.`
+                          : `You needed at least ${formatScore(third.score)} to make the podium. You scored ${formatScore(mine.score)} (${diff} point${diff === 1 ? "" : "s"} short).`
+                      );
+                    } else {
+                      // Fewer than 3 entries returned; treat as podium
+                      setOnPodium(true);
+                      setPodiumMessage(`You’re on the podium.`);
+                    }
+                  }
+                } else {
+                  setPodiumMessage("Couldn’t check the podium right now.");
+                }
+              }
+            } catch {
+              setPodiumMessage("Couldn’t check the podium right now.");
+            }
+          } else {
+            /* non-fatal */
+          }
+        } catch {
+          /* ignore network error while saving */
+        } finally {
+          setSaving(false);
+        }
       } else {
         const err = json as ApiError;
         setError(err.error || "Request failed");
-        setApiMeta({
-          attempts: err.attempts ?? 0,
-          upstreamMs: err.timings?.upstreamMs ?? 0,
-          totalMs: err.timings?.totalMs ?? 0,
-          upstreamStatus: err.upstreamStatus ?? null,
-          usage: err.details ?? null,
-          clientMs,
-        });
       }
     } catch (err: unknown) {
       const isAbort =
@@ -268,19 +383,33 @@ export default function Home() {
   const removeImage = () => {
     revokeAbort();
     setImageDataUrl(null);
-    setImageInfo(null);
     resetResult();
   };
   return (
     <div ref={containerRef} className="min-h-dvh p-6 sm:p-10">
       <div className="mx-auto max-w-5xl space-y-6">
+        {/* Top partner banner (sticky, ultra-subtle, hidden on mobile) */}
+        <div className="hidden md:block sticky top-0 z-30 transition bg-background border-b">
+          <PartnerBanner />
+        </div>
         <header className="flex items-center justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-              ClipTagger-12b Playground
+              Performative Male Contest
             </h1>
             <p className="text-sm text-muted-foreground">
-              Upload or paste an image, then annotate using Inference.net
+              Enter the contest: upload or paste a photo, get a score out of 10, and climb the leaderboard.
+            </p>
+            <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+              Powered by{' '}
+              <a
+                href="https://inference.net/blog/cliptagger-12b"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-foreground"
+              >
+                ClipTagger
+              </a>
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -290,22 +419,14 @@ export default function Home() {
                 JPEG · PNG · WebP · GIF
               </div>
             </div>
-            <button
-              onClick={() => setCodeOpen(true)}
-              className="inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm hover:bg-accent"
-            >
-              <Code2 className="size-4" /> Code
-            </button>
+            <Link href="/leaderboard" className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+              View Leaderboard
+            </Link>
           </div>
         </header>
 
-        <section>
-          <PartnerBanner />
-        </section>
+        {/* Removed secondary banner to avoid duplication */}
 
-        <section>
-          <ModelIntro />
-        </section>
 
         <section>
           <div
@@ -321,26 +442,103 @@ export default function Home() {
           >
             {!hasImage ? (
               <EmptyUploadState
-                label="Drop an image here"
+                label="Drop a photo to get your score"
                 accept={`${ACCEPTED_MIME.join(",")},image/*`}
                 onChange={onFileChange}
-                helper="or press ⌘/Ctrl+V to paste"
+                helper="or paste a photo (⌘/Ctrl+V)"
               />
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                 <div className="space-y-3">
-                  <div className="rounded-lg overflow-hidden border bg-black/5">
+                  <div className="relative rounded-lg overflow-hidden border bg-black/5">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={imageDataUrl!}
-                      alt="Selected"
+                      alt="Selected photo"
                       className="w-full h-auto object-contain"
                     />
+                    {/* Score overlay */}
+                    {saving && (
+                      <div className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white backdrop-blur">
+                        <Loader2 className="size-3 animate-spin" /> Submitting to leaderboard…
+                      </div>
+                    )}
+                    {!saving && score !== null && (
+                      <div className="absolute inset-x-3 bottom-3 sm:left-3 sm:right-auto sm:bottom-3 inline-flex items-center gap-3 rounded-2xl bg-black/65 px-3 sm:px-4 py-2.5 text-white ring-1 ring-white/10 backdrop-blur">
+                        <div className="relative h-12 w-12 shrink-0">
+                          <div
+                            className="absolute inset-0 rounded-full"
+                            style={{
+                              background: `conic-gradient(${gaugeColor} ${scorePercent}%, rgba(255,255,255,0.12) 0)`,
+                            }}
+                            aria-hidden
+                          />
+                          <div className="absolute inset-1 rounded-full bg-black/70 flex items-center justify-center">
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-xl font-bold tabular-nums leading-none">{displayedScore}</span>
+                              <span className="text-[10px] leading-none opacity-80">{scoreSuffix(score)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold leading-tight">
+                            {scoreLabel(score)}
+                          </div>
+                          {matchedKeywords.length > 0 && (
+                            <div className="mt-1 hidden sm:flex flex-wrap gap-1.5">
+                              {matchedKeywords.slice(0, 3).map((k) => (
+                                <span key={k} className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-medium">
+                                  {k}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <Link
+                          href="/leaderboard"
+                          className="hidden sm:inline-flex items-center rounded-full bg-white/15 hover:bg-white/25 px-2.5 py-1 text-[11px] font-medium"
+                        >
+                          Leaderboard
+                        </Link>
+                      </div>
+                    )}
                   </div>
+                  {!saving && score !== null && (
+                    <div className="rounded-xl border p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium">Your performativity</div>
+                        <div className="text-xs text-muted-foreground">{formatScore(score)}</div>
+                      </div>
+                      <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
+                        <div className={cn("h-full rounded-full transition-[width] duration-700", barFillClass)} style={{ width: `${scorePercent}%` }} />
+                      </div>
+                      {onPodium !== null && podiumMessage && (
+                        <div className={cn(
+                          "mt-3 inline-flex items-start gap-2 rounded-md px-3 py-2 text-[12px]",
+                          onPodium ? "bg-emerald-500/10 text-emerald-800" : "bg-amber-500/10 text-amber-800"
+                        )}>
+                          {onPodium ? (
+                            <Trophy className="mt-0.5 size-4" />
+                          ) : (
+                            <AlertCircle className="mt-0.5 size-4" />
+                          )}
+                          <span className="leading-snug">{podiumMessage}</span>
+                        </div>
+                      )}
+                      {matchedKeywords.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {matchedKeywords.map((k) => (
+                            <span key={k} className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium">
+                              {k}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="flex flex-wrap gap-2">
                     <button
-                      type="button"
-                      onClick={annotate}
+                      type="submit"
                       disabled={annotating}
                       className={cn(
                         "inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground",
@@ -354,11 +552,11 @@ export default function Home() {
                       ) : (
                         <Wand2 className="size-4" />
                       )}{" "}
-                      Annotate
+                      Get My Score
                     </button>
                     <label className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-accent cursor-pointer">
                       <RotateCcw className="size-4" />
-                      <span>Replace</span>
+                      <span>Upload new photo</span>
                       <input
                         ref={fileInputRef}
                         type="file"
@@ -372,7 +570,7 @@ export default function Home() {
                       onClick={removeImage}
                       className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-accent"
                     >
-                      <Trash2 className="size-4" /> Remove
+                      <Trash2 className="size-4" /> Clear photo
                     </button>
                     {/* file input controlled by labels above */}
                     {annotating && (
@@ -386,66 +584,85 @@ export default function Home() {
                     )}
                   </div>
 
-                  {imageInfo && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      <Stat
-                        icon={BarChart3}
-                        label="Size"
-                        value={formatBytes(imageInfo.size)}
-                      />
-                      <Stat
-                        icon={Activity}
-                        label="Dimensions"
-                        value={`${imageInfo.width}×${imageInfo.height}`}
-                      />
-                      <Stat
-                        icon={BarChart3}
-                        label="Type"
-                        value={imageInfo.type
-                          .replace("image/", "")
-                          .toUpperCase()}
-                      />
-                    </div>
-                  )}
+                  {/* Simplified: hide technical image details for average users */}
                 </div>
 
                 <div className="space-y-3">
                   {error && <ErrorAlert message={error} />}
-
-                  {apiMeta && <ApiMetaStats meta={{
-                    attempts: apiMeta.attempts,
-                    upstreamMs: apiMeta.upstreamMs,
-                    totalMs: apiMeta.totalMs,
-                    upstreamStatus: apiMeta.upstreamStatus,
-                    clientMs: apiMeta.clientMs,
-                  }} />}
+                  {/* Pre-submit social + opt-in, always before scoring */}
+                  <div className="rounded-lg border p-4 space-y-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Social (optional)</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <Select
+                            value={(watch('socialPlatform') ?? '') as string}
+                            onValueChange={(v) => {
+                              if (v === 'none') {
+                                setValue('socialPlatform', '');
+                              } else {
+                                setValue('socialPlatform', v as 'twitter' | 'instagram' | 'tiktok');
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Platform" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="twitter">Twitter / X</SelectItem>
+                              <SelectItem value="instagram">Instagram</SelectItem>
+                              <SelectItem value="tiktok">TikTok</SelectItem>
+                              <SelectItem value="none">None</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <input type="hidden" {...register('socialPlatform')} />
+                          <Input
+                            {...register('socialHandle')}
+                            placeholder="handle (no @)"
+                            className="col-span-2"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 sm:mt-6 text-sm">
+                        <Checkbox id="podiumOptIn" {...register('podiumOptIn')} />
+                        <Label htmlFor="podiumOptIn" className="m-0">Opt-in to podium display</Label>
+                      </div>
+                    </div>
+                  </div>
 
                   {result ? (
-                    <JsonResultPanel json={result} />
+                    <div className="rounded-lg border p-4 space-y-3">
+                      <div>
+                        <div className="text-sm font-medium">Summary</div>
+                        {result.summary && (
+                          <p className="mt-1 text-sm text-muted-foreground">{result.summary}</p>
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-xs font-medium mb-1">Highlights</div>
+                        <div className="flex flex-wrap gap-1">
+                          {[...new Set([...(result.objects || []), ...(result.actions || []), result.specific_style, result.environment, result.production_quality, ...(result.logos || [])].filter(Boolean) as string[])].slice(0, 12).map((t) => (
+                            <span key={t} className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs">{t}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">Powered by ClipTagger</div>
+                    </div>
                   ) : (
                     <div className="rounded-lg border p-4 text-sm text-muted-foreground">
                       {annotating ? (
                         <div className="inline-flex items-center gap-2">
                           <Loader2 className="size-4 animate-spin" />{" "}
-                          Annotating…
+                          Scoring…
                         </div>
                       ) : (
-                        <div>Result will appear here after you annotate.</div>
+                        <div>Your score and breakdown will appear here after you click “Get My Score”.</div>
                       )}
                     </div>
                   )}
                 </div>
-              </div>
+              </form>
             )}
-          </div>
-        </section>
-
-        <section>
-          <div className="mt-6">
-            <h2 className="text-lg font-semibold mb-2">
-              Video (5-frame) Annotator
-            </h2>
-            <VideoAnnotator />
           </div>
         </section>
 
@@ -453,12 +670,24 @@ export default function Home() {
           <div className="text-xs text-muted-foreground">{notice}</div>
         )}
 
+        <section className="rounded-xl border p-4 sm:p-6 space-y-3">
+          <h2 className="text-lg font-semibold">Rules</h2>
+          <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+            <li>Only submit images you have the right to share. No illegal or harmful content.</li>
+            <li>Do not upload faces of private individuals without their consent.</li>
+            <li>Max image size is 4.5MB. Supported: JPEG, PNG, WebP, GIF.</li>
+            <li>Scores are automated and for fun; they may be inaccurate.</li>
+            <li>We may remove submissions that violate these rules.</li>
+            <li>Leaderboard eligibility: entries must score at least 3/10 and include a male subject (detected automatically).</li>
+            <li>Podium shows the top 3 eligible entries. Ties are broken by newer submissions.</li>
+          </ul>
+        </section>
+
         <footer className="text-xs text-muted-foreground">
-          Pro tip: You can paste an image from your clipboard directly onto this
-          page.
+          Pro tip: Paste a photo from your clipboard to enter instantly.
         </footer>
 
-        <CodeModal open={codeOpen} onOpenChange={setCodeOpen} />
+        {/* Developer code modal removed for simplicity */}
       </div>
     </div>
   );

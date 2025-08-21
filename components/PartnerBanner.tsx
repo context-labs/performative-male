@@ -10,22 +10,20 @@ export function PartnerBanner() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Read the Grass × Inference launch blog"
-      className="group block"
+      className="block"
     >
-      <div className="relative overflow-hidden rounded-xl border">
-        <div className="relative aspect-[16/3] w-full">
+      <div className="relative overflow-hidden rounded-lg border bg-background">
+        <div className="relative w-full h-12 sm:h-14 md:h-16 lg:h-20">
           <Image
             src="/grass-inference-logs.png"
             alt="Grass × Inference"
             fill
-            priority
             sizes="100vw"
             quality={100}
             className="object-cover"
           />
         </div>
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/50 via-black/25 to-transparent transition-opacity group-hover:opacity-80" />
-        <div className="absolute bottom-2 right-2 rounded-md bg-black/60 px-2 py-1 text-[10px] font-medium text-white backdrop-blur-sm">
+        <div className="absolute bottom-1.5 right-1.5 rounded-xs bg-black px-1.5 py-0.5 text-[9px] font-medium text-white">
           Read the blog →
         </div>
       </div>
