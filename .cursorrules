@@ -1,0 +1,2 @@
+always use pnpm
+never run pnpm build, there's never a reason to

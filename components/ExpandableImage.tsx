@@ -17,6 +17,8 @@ export function ExpandableImage({ src, alt, className }: ExpandableImageProps) {
         <img
           src={src}
           alt={alt ?? "Preview"}
+          loading="lazy"
+          decoding="async"
           className={cn("cursor-zoom-in", className)}
         />
       </DialogTrigger>
@@ -27,6 +29,8 @@ export function ExpandableImage({ src, alt, className }: ExpandableImageProps) {
           <img
             src={src}
             alt={alt ?? "Preview expanded"}
+            loading="lazy"
+            decoding="async"
             className="h-full w-full max-h-[85vh] object-contain bg-black/5"
           />
         </div>

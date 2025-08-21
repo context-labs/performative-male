@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Loader2, Trash2, Wand2, RotateCcw, Trophy, AlertCircle } from "lucide-react";
+import {
+  Loader2,
+  Trash2,
+  Wand2,
+  RotateCcw,
+  Trophy,
+  AlertCircle,
+} from "lucide-react";
 import { ErrorAlert } from "@/components/ErrorAlert";
 import { EmptyUploadState } from "@/components/EmptyUploadState";
 import { PartnerBanner } from "@/components/PartnerBanner";
@@ -11,7 +18,13 @@ import { useForm } from "react-hook-form";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type ClipTaggerResult = {
   description: string;
@@ -25,22 +38,7 @@ type ClipTaggerResult = {
   logos: string[];
 };
 
-type ApiSuccess = {
-  success: true;
-  result: ClipTaggerResult;
-  usage: unknown;
-  upstreamStatus: number | null;
-  attempts: number;
-  timings: { upstreamMs: number; totalMs: number };
-};
-
-type ApiError = {
-  error: string;
-  attempts?: number;
-  timings?: { upstreamMs: number; totalMs: number };
-  upstreamStatus?: number | null;
-  details?: unknown;
-};
+// NOTE: single-submit flow; annotate handled server-side
 
 const MAX_IMAGE_BYTES = 4.5 * 1024 * 1024; // 4.5MB
 const ACCEPTED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -66,12 +64,16 @@ export default function Home() {
   const [podiumMessage, setPodiumMessage] = useState<string | null>(null);
 
   type FormValues = {
-    socialPlatform: 'twitter' | 'instagram' | 'tiktok' | '';
+    socialPlatform: "twitter" | "instagram" | "tiktok" | "";
     socialHandle: string;
-    podiumOptIn: boolean;
+    leaderboardOptIn: boolean;
   };
   const { register, handleSubmit, setValue, watch } = useForm<FormValues>({
-    defaultValues: { socialPlatform: '', socialHandle: '', podiumOptIn: true },
+    defaultValues: {
+      socialPlatform: "",
+      socialHandle: "",
+      leaderboardOptIn: true,
+    },
   });
 
   const hasImage = Boolean(imageDataUrl);
@@ -176,7 +178,11 @@ export default function Home() {
     // Listen at window-level and in capture phase so paste works anywhere on the page
     window.addEventListener("paste", handler as unknown as EventListener, true);
     return () => {
-      window.removeEventListener("paste", handler as unknown as EventListener, true);
+      window.removeEventListener(
+        "paste",
+        handler as unknown as EventListener,
+        true
+      );
     };
   }, [onPaste]);
   // Animate the visible score when the real score arrives
@@ -203,18 +209,23 @@ export default function Home() {
   }, [score, saving]);
 
   // Cap the gauge at 10; higher scores still display numerically but the visual ring is maxed
-  const scorePercent = score != null ? Math.max(0, Math.min(100, (Math.min(score, 10) / 10) * 100)) : 0;
-  const gaugeColor = score != null && score >= 8
-    ? "rgb(16 185 129)" // emerald-500
-    : score != null && score >= 5
-    ? "rgb(245 158 11)" // amber-500
-    : "rgb(244 63 94)"; // rose-500
+  const scorePercent =
+    score != null
+      ? Math.max(0, Math.min(100, (Math.min(score, 10) / 10) * 100))
+      : 0;
+  const gaugeColor =
+    score != null && score >= 8
+      ? "rgb(16 185 129)" // emerald-500
+      : score != null && score >= 5
+      ? "rgb(245 158 11)" // amber-500
+      : "rgb(244 63 94)"; // rose-500
 
-  const barFillClass = score != null && score >= 8
-    ? "bg-emerald-500"
-    : score != null && score >= 5
-    ? "bg-amber-500"
-    : "bg-rose-500";
+  const barFillClass =
+    score != null && score >= 8
+      ? "bg-emerald-500"
+      : score != null && score >= 5
+      ? "bg-amber-500"
+      : "bg-rose-500";
 
   const scoreLabel = (s: number | null) => {
     if (s == null) return "";
@@ -226,9 +237,9 @@ export default function Home() {
     return "Low performativity";
   };
 
-  const scoreSuffix = (s: number | null) => (s != null && s > 10 ? "/10+" : "/10");
+  const scoreSuffix = (s: number | null) =>
+    s != null && s > 10 ? "/10+" : "/10";
   const formatScore = (s: number) => `${s}${s > 10 ? "/10+" : "/10"}`;
-
 
   // removed byte formatter for a simpler UI
 
@@ -241,120 +252,146 @@ export default function Home() {
     setOnPodium(null);
     setPodiumMessage(null);
     setAnnotating(true);
+    setSaving(true);
     revokeAbort();
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const resp = await fetch("/api/annotate", {
+      const submitResp = await fetch("/api/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageDataUrl }),
+        body: JSON.stringify({
+          imageDataUrl,
+          socialPlatform: formData.socialPlatform || undefined,
+          socialHandle: formData.socialHandle || undefined,
+          // Support new name on server by mapping to existing field
+          podiumOptIn: formData.leaderboardOptIn,
+        }),
         signal: controller.signal,
       });
-      const json = (await resp.json()) as ApiSuccess | ApiError;
-      if (resp.ok && (json as ApiSuccess).success) {
-        const ok = json as ApiSuccess;
+      const submitJson = (await submitResp.json()) as
+        | {
+            success: true;
+            id: number;
+            score: number;
+            matchedKeywords: string[];
+            createdAt: string;
+            result: ClipTaggerResult;
+          }
+        | { error: string };
+      if (submitResp.ok && "success" in submitJson) {
+        const ok = submitJson;
         setResult(ok.result);
-        // After successful annotation, submit to leaderboard API
+        setScore(ok.score);
+        setMatchedKeywords(ok.matchedKeywords ?? []);
+
+        // Determine podium status and reason
         try {
-          setSaving(true);
-          const submitResp = await fetch("/api/submit", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              imageDataUrl,
-              result: ok.result,
-              socialPlatform: formData.socialPlatform || undefined,
-              socialHandle: formData.socialHandle || undefined,
-              podiumOptIn: formData.podiumOptIn,
-            }),
-          });
-          if (submitResp.ok) {
-            const submitJson = (await submitResp.json()) as {
-              success: true;
-              id: number;
-              score: number;
-              matchedKeywords: string[];
-              createdAt: string;
-            };
-            setScore(submitJson.score);
-            setMatchedKeywords(submitJson.matchedKeywords ?? []);
-
-            // Determine podium status and reason
-            try {
-              const isEligibleForLeaderboard = (r: ClipTaggerResult | null | undefined, s: number) => {
-                if (s < 3) return { eligible: false, reason: `Minimum score for the leaderboard is 3. You scored ${s}.` };
-                const pieces: string[] = [];
-                if (r) {
-                  pieces.push(r.description, r.environment, r.summary);
-                  if (Array.isArray(r.objects)) pieces.push(...r.objects);
-                  if (Array.isArray(r.actions)) pieces.push(...r.actions);
-                  if (Array.isArray(r.logos)) pieces.push(...r.logos);
-                }
-                const joined = pieces.join(" ").toLowerCase();
-                const hasMaleSubject = /\b(man|male|guy|boy|gentleman|dude|men|boys|guys|person)\b/i.test(joined);
-                if (!hasMaleSubject) {
-                  return { eligible: false, reason: `Podium is limited to entries tagged as a male subject. Your submission didn’t include a male keyword.` };
-                }
-                return { eligible: true } as const;
+          const isEligibleForLeaderboard = (
+            r: ClipTaggerResult | null | undefined,
+            s: number
+          ) => {
+            if (s < 3)
+              return {
+                eligible: false,
+                reason: `Minimum score for the leaderboard is 3. You scored ${s}.`,
               };
+            const pieces: string[] = [];
+            if (r) {
+              pieces.push(r.description, r.environment, r.summary);
+              if (Array.isArray(r.objects)) pieces.push(...r.objects);
+              if (Array.isArray(r.actions)) pieces.push(...r.actions);
+              if (Array.isArray(r.logos)) pieces.push(...r.logos);
+            }
+            const joined = pieces.join(" ").toLowerCase();
+            const hasMaleSubject =
+              /\b(man|male|guy|boy|gentleman|dude|men|boys|guys|person)\b/i.test(
+                joined
+              );
+            if (!hasMaleSubject) {
+              return {
+                eligible: false,
+                reason: `Leaderboard is limited to entries tagged as a male subject. Your submission didn’t include a male keyword.`,
+              };
+            }
+            return { eligible: true } as const;
+          };
 
-              const eligibility = isEligibleForLeaderboard(ok.result, submitJson.score);
-              if (!eligibility.eligible) {
-                setOnPodium(false);
-                setPodiumMessage(eligibility.reason as string);
+          const eligibility = isEligibleForLeaderboard(ok.result, ok.score);
+          if (!eligibility.eligible) {
+            setOnPodium(false);
+            setPodiumMessage(eligibility.reason as string);
+          } else {
+            const lbResp = await fetch("/api/leaderboard", { method: "GET" });
+            if (lbResp.ok) {
+              const lb = (await lbResp.json()) as {
+                success: true;
+                entries: Array<{
+                  id: number;
+                  score: number;
+                  createdAt: string;
+                }>;
+              };
+              const mine = {
+                id: ok.id,
+                score: ok.score,
+                createdAt: ok.createdAt,
+              };
+              const byId = new Map<
+                number,
+                { id: number; score: number; createdAt: string }
+              >();
+              for (const e of lb.entries) byId.set(e.id, e);
+              byId.set(mine.id, mine);
+              const all = Array.from(byId.values());
+              all.sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                return (
+                  new Date(b.createdAt).getTime() -
+                  new Date(a.createdAt).getTime()
+                );
+              });
+              const myIdx = all.findIndex((e) => e.id === mine.id);
+              const myRank = myIdx >= 0 ? myIdx + 1 : null;
+              if (myRank != null && myRank <= 25) {
+                setOnPodium(true);
+                setPodiumMessage(`You made the leaderboard at #${myRank}.`);
               } else {
-                const lbResp = await fetch("/api/leaderboard", { method: "GET" });
-                if (lbResp.ok) {
-                  const lb = (await lbResp.json()) as { success: true; entries: Array<{ id: number; score: number; createdAt: string }> };
-                  const mine = { id: submitJson.id, score: submitJson.score, createdAt: submitJson.createdAt };
-                  const byId = new Map<number, { id: number; score: number; createdAt: string }>();
-                  for (const e of lb.entries) byId.set(e.id, e);
-                  byId.set(mine.id, mine);
-                  const all = Array.from(byId.values());
-                  all.sort((a, b) => {
-                    if (b.score !== a.score) return b.score - a.score;
-                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-                  });
-                  const myIdx = all.findIndex((e) => e.id === mine.id);
-                  const myRank = myIdx >= 0 ? myIdx + 1 : null;
-                  if (myRank != null && myRank <= 3) {
-                    setOnPodium(true);
-                    setPodiumMessage(`You’re on the podium at #${myRank}.`);
-                  } else {
-                    const third = all[2];
-                    if (third) {
-                      const diff = Math.max(0, third.score - mine.score);
-                      setOnPodium(false);
-                      setPodiumMessage(
-                        diff === 0
-                          ? `Podium is currently full at ${formatScore(third.score)}. Newer entries with the same score take priority.`
-                          : `You needed at least ${formatScore(third.score)} to make the podium. You scored ${formatScore(mine.score)} (${diff} point${diff === 1 ? "" : "s"} short).`
-                      );
-                    } else {
-                      // Fewer than 3 entries returned; treat as podium
-                      setOnPodium(true);
-                      setPodiumMessage(`You’re on the podium.`);
-                    }
-                  }
+                const twentyFifth = all[24];
+                if (twentyFifth) {
+                  const diff = Math.max(0, twentyFifth.score - mine.score);
+                  setOnPodium(false);
+                  setPodiumMessage(
+                    diff === 0
+                      ? `Leaderboard is currently full at ${formatScore(
+                          twentyFifth.score
+                        )}. Newer entries with the same score take priority.`
+                      : `You needed at least ${formatScore(
+                          twentyFifth.score
+                        )} to make the leaderboard. You scored ${formatScore(
+                          mine.score
+                        )} (${diff} point${diff === 1 ? "" : "s"} short).`
+                  );
                 } else {
-                  setPodiumMessage("Couldn’t check the podium right now.");
+                  // Fewer than 25 entries returned; treat as leaderboard
+                  setOnPodium(true);
+                  setPodiumMessage(`You made the leaderboard.`);
                 }
               }
-            } catch {
-              setPodiumMessage("Couldn’t check the podium right now.");
+            } else {
+              setPodiumMessage("Couldn’t check the leaderboard right now.");
             }
-          } else {
-            /* non-fatal */
           }
         } catch {
-          /* ignore network error while saving */
-        } finally {
-          setSaving(false);
+          setPodiumMessage("Couldn’t check the leaderboard right now.");
         }
       } else {
-        const err = json as ApiError;
-        setError(err.error || "Request failed");
+        const err = submitJson as { error?: string };
+        if (submitResp.status === 409) {
+          setError(err.error || "Duplicate image");
+        } else {
+          setError(err.error || "Request failed");
+        }
       }
     } catch (err: unknown) {
       const isAbort =
@@ -365,12 +402,13 @@ export default function Home() {
             "name" in err &&
             (err as { name?: string }).name === "AbortError";
       if (isAbort) {
-        setError("Annotation canceled");
+        setError("Submission canceled");
       } else {
         setError("Network error");
       }
     } finally {
       setAnnotating(false);
+      setSaving(false);
       abortRef.current = null;
     }
   };
@@ -395,13 +433,14 @@ export default function Home() {
         <header className="flex items-center justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-              Performative Male Contest
+              Performative Male Detector
             </h1>
             <p className="text-sm text-muted-foreground">
-              Enter the contest: upload or paste a photo, get a score out of 10, and climb the leaderboard.
+              Enter the contest: upload or paste a photo, get a score out of 10,
+              and climb the leaderboard.
             </p>
             <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-              Powered by{' '}
+              Powered by{" "}
               <a
                 href="https://inference.net/blog/cliptagger-12b"
                 target="_blank"
@@ -419,14 +458,16 @@ export default function Home() {
                 JPEG · PNG · WebP · GIF
               </div>
             </div>
-            <Link href="/leaderboard" className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+            <Link
+              href="/leaderboard"
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
               View Leaderboard
             </Link>
           </div>
         </header>
 
         {/* Removed secondary banner to avoid duplication */}
-
 
         <section>
           <div
@@ -448,7 +489,10 @@ export default function Home() {
                 helper="or paste a photo (⌘/Ctrl+V)"
               />
             ) : (
-              <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              <form
+                onSubmit={handleSubmit(onSubmit)}
+                className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start"
+              >
                 <div className="space-y-3">
                   <div className="relative rounded-lg overflow-hidden border bg-black/5">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -460,7 +504,8 @@ export default function Home() {
                     {/* Score overlay */}
                     {saving && (
                       <div className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white backdrop-blur">
-                        <Loader2 className="size-3 animate-spin" /> Submitting to leaderboard…
+                        <Loader2 className="size-3 animate-spin" /> Submitting
+                        to leaderboard…
                       </div>
                     )}
                     {!saving && score !== null && (
@@ -475,8 +520,12 @@ export default function Home() {
                           />
                           <div className="absolute inset-1 rounded-full bg-black/70 flex items-center justify-center">
                             <div className="flex items-baseline gap-1">
-                              <span className="text-xl font-bold tabular-nums leading-none">{displayedScore}</span>
-                              <span className="text-[10px] leading-none opacity-80">{scoreSuffix(score)}</span>
+                              <span className="text-xl font-bold tabular-nums leading-none">
+                                {displayedScore}
+                              </span>
+                              <span className="text-[10px] leading-none opacity-80">
+                                {scoreSuffix(score)}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -487,7 +536,10 @@ export default function Home() {
                           {matchedKeywords.length > 0 && (
                             <div className="mt-1 hidden sm:flex flex-wrap gap-1.5">
                               {matchedKeywords.slice(0, 3).map((k) => (
-                                <span key={k} className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-medium">
+                                <span
+                                  key={k}
+                                  className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-medium"
+                                >
                                   {k}
                                 </span>
                               ))}
@@ -506,17 +558,31 @@ export default function Home() {
                   {!saving && score !== null && (
                     <div className="rounded-xl border p-3">
                       <div className="flex items-center justify-between">
-                        <div className="text-sm font-medium">Your performativity</div>
-                        <div className="text-xs text-muted-foreground">{formatScore(score)}</div>
+                        <div className="text-sm font-medium">
+                          Your performativity
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatScore(score)}
+                        </div>
                       </div>
                       <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
-                        <div className={cn("h-full rounded-full transition-[width] duration-700", barFillClass)} style={{ width: `${scorePercent}%` }} />
+                        <div
+                          className={cn(
+                            "h-full rounded-full transition-[width] duration-700",
+                            barFillClass
+                          )}
+                          style={{ width: `${scorePercent}%` }}
+                        />
                       </div>
                       {onPodium !== null && podiumMessage && (
-                        <div className={cn(
-                          "mt-3 inline-flex items-start gap-2 rounded-md px-3 py-2 text-[12px]",
-                          onPodium ? "bg-emerald-500/10 text-emerald-800" : "bg-amber-500/10 text-amber-800"
-                        )}>
+                        <div
+                          className={cn(
+                            "mt-3 inline-flex items-start gap-2 rounded-md px-3 py-2 text-[12px]",
+                            onPodium
+                              ? "bg-emerald-500/10 text-emerald-800"
+                              : "bg-amber-500/10 text-amber-800"
+                          )}
+                        >
                           {onPodium ? (
                             <Trophy className="mt-0.5 size-4" />
                           ) : (
@@ -528,7 +594,10 @@ export default function Home() {
                       {matchedKeywords.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {matchedKeywords.map((k) => (
-                            <span key={k} className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium">
+                            <span
+                              key={k}
+                              className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium"
+                            >
                               {k}
                             </span>
                           ))}
@@ -536,7 +605,58 @@ export default function Home() {
                       )}
                     </div>
                   )}
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    {/* Inline social + opt-in controls (mobile-friendly) */}
+                    <div className="inline-flex w-full sm:w-auto flex-wrap items-center gap-2 rounded-md border px-2.5 py-2 text-sm">
+                      <Label className="text-xs text-muted-foreground">
+                        Feature Your Socials On The Leaderboard (optional)
+                      </Label>
+                      <div className="flex flex-1 sm:flex-none items-center gap-2 min-w-0">
+                        <Select
+                          value={(watch("socialPlatform") ?? "") as string}
+                          onValueChange={(v) => {
+                            if (v === "none") {
+                              setValue("socialPlatform", "");
+                            } else {
+                              setValue(
+                                "socialPlatform",
+                                v as "twitter" | "instagram" | "tiktok"
+                              );
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-8 w-[120px]">
+                            <SelectValue placeholder="Platform" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="twitter">Twitter / X</SelectItem>
+                            <SelectItem value="instagram">Instagram</SelectItem>
+                            <SelectItem value="tiktok">TikTok</SelectItem>
+                            <SelectItem value="none">None</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <input type="hidden" {...register("socialPlatform")} />
+                        <Input
+                          {...register("socialHandle")}
+                          placeholder="handle (no @)"
+                          className="h-8 flex-1 sm:flex-none min-w-[120px] sm:w-[180px]"
+                        />
+                        {/* leaderboard checkbox moved out to its own control */}
+                      </div>
+                    </div>
+                    {/* Separate leaderboard opt-in */}
+                    <div className="inline-flex items-center gap-2 rounded-md border px-2.5 py-2 text-sm">
+                      <Checkbox
+                        id="leaderboardOptIn"
+                        checked={Boolean(watch("leaderboardOptIn"))}
+                        onCheckedChange={(v) => setValue("leaderboardOptIn", Boolean(v))}
+                      />
+                      <Label htmlFor="leaderboardOptIn" className="m-0 text-xs sm:text-sm">
+                        Opt-in to leaderboard
+                      </Label>
+                    </div>
+                    {/* keep field registered in the form state */}
+                    <input type="hidden" {...register("leaderboardOptIn")} />
                     <button
                       type="submit"
                       disabled={annotating}
@@ -554,6 +674,7 @@ export default function Home() {
                       )}{" "}
                       Get My Score
                     </button>
+
                     <label className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-accent cursor-pointer">
                       <RotateCcw className="size-4" />
                       <span>Upload new photo</span>
@@ -589,74 +710,60 @@ export default function Home() {
 
                 <div className="space-y-3">
                   {error && <ErrorAlert message={error} />}
-                  {/* Pre-submit social + opt-in, always before scoring */}
-                  <div className="rounded-lg border p-4 space-y-3">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Social (optional)</Label>
-                        <div className="grid grid-cols-3 gap-2">
-                          <Select
-                            value={(watch('socialPlatform') ?? '') as string}
-                            onValueChange={(v) => {
-                              if (v === 'none') {
-                                setValue('socialPlatform', '');
-                              } else {
-                                setValue('socialPlatform', v as 'twitter' | 'instagram' | 'tiktok');
-                              }
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Platform" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="twitter">Twitter / X</SelectItem>
-                              <SelectItem value="instagram">Instagram</SelectItem>
-                              <SelectItem value="tiktok">TikTok</SelectItem>
-                              <SelectItem value="none">None</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <input type="hidden" {...register('socialPlatform')} />
-                          <Input
-                            {...register('socialHandle')}
-                            placeholder="handle (no @)"
-                            className="col-span-2"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1 sm:mt-6 text-sm">
-                        <Checkbox id="podiumOptIn" {...register('podiumOptIn')} />
-                        <Label htmlFor="podiumOptIn" className="m-0">Opt-in to podium display</Label>
-                      </div>
-                    </div>
-                  </div>
 
                   {result ? (
                     <div className="rounded-lg border p-4 space-y-3">
                       <div>
                         <div className="text-sm font-medium">Summary</div>
                         {result.summary && (
-                          <p className="mt-1 text-sm text-muted-foreground">{result.summary}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {result.summary}
+                          </p>
                         )}
                       </div>
                       <div>
-                        <div className="text-xs font-medium mb-1">Highlights</div>
+                        <div className="text-xs font-medium mb-1">
+                          Highlights
+                        </div>
                         <div className="flex flex-wrap gap-1">
-                          {[...new Set([...(result.objects || []), ...(result.actions || []), result.specific_style, result.environment, result.production_quality, ...(result.logos || [])].filter(Boolean) as string[])].slice(0, 12).map((t) => (
-                            <span key={t} className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs">{t}</span>
-                          ))}
+                          {[
+                            ...new Set(
+                              [
+                                ...(result.objects || []),
+                                ...(result.actions || []),
+                                result.specific_style,
+                                result.environment,
+                                result.production_quality,
+                                ...(result.logos || []),
+                              ].filter(Boolean) as string[]
+                            ),
+                          ]
+                            .slice(0, 12)
+                            .map((t) => (
+                              <span
+                                key={t}
+                                className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs"
+                              >
+                                {t}
+                              </span>
+                            ))}
                         </div>
                       </div>
-                      <div className="text-[11px] text-muted-foreground">Powered by ClipTagger</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        Powered by ClipTagger
+                      </div>
                     </div>
                   ) : (
                     <div className="rounded-lg border p-4 text-sm text-muted-foreground">
                       {annotating ? (
                         <div className="inline-flex items-center gap-2">
-                          <Loader2 className="size-4 animate-spin" />{" "}
-                          Scoring…
+                          <Loader2 className="size-4 animate-spin" /> Scoring…
                         </div>
                       ) : (
-                        <div>Your score and breakdown will appear here after you click “Get My Score”.</div>
+                        <div>
+                          Your score and breakdown will appear here after you
+                          click “Get My Score”.
+                        </div>
                       )}
                     </div>
                   )}
@@ -673,13 +780,24 @@ export default function Home() {
         <section className="rounded-xl border p-4 sm:p-6 space-y-3">
           <h2 className="text-lg font-semibold">Rules</h2>
           <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
-            <li>Only submit images you have the right to share. No illegal or harmful content.</li>
-            <li>Do not upload faces of private individuals without their consent.</li>
+            <li>
+              Only submit images you have the right to share. No illegal or
+              harmful content.
+            </li>
+            <li>
+              Do not upload faces of private individuals without their consent.
+            </li>
             <li>Max image size is 4.5MB. Supported: JPEG, PNG, WebP, GIF.</li>
             <li>Scores are automated and for fun; they may be inaccurate.</li>
             <li>We may remove submissions that violate these rules.</li>
-            <li>Leaderboard eligibility: entries must score at least 3/10 and include a male subject (detected automatically).</li>
-            <li>Podium shows the top 3 eligible entries. Ties are broken by newer submissions.</li>
+            <li>
+              Leaderboard eligibility: entries must score at least 3/10 and
+              include a male subject (detected automatically).
+            </li>
+            <li>
+              Leaderboard shows the top 25 eligible entries. Ties are broken by newer
+              submissions.
+            </li>
           </ul>
         </section>
 

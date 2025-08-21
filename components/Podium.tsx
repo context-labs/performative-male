@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 export type PodiumEntry = {
   id: number;
-  imageDataUrl: string;
+  imageId: number;
   score: number;
   matchedKeywords: string[];
   createdAt: string;
@@ -74,7 +74,7 @@ function RankCard({ rank, entry }: RankCardProps) {
     >
       <div className={cn("relative overflow-hidden rounded-md bg-muted", imageHeight)}>
         <ExpandableImage
-          src={entry.imageDataUrl}
+          src={`/img/${entry.imageId}?w=${isFirst ? 1024 : 800}&fmt=webp&q=72`}
           alt={`Rank ${rank} submission`}
           className="h-full w-full object-contain"
         />

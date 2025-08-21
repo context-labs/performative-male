@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const minScore = Math.max(0, Math.min(10, Number(url.searchParams.get('minScore') ?? '3') || 3));
   const limit = (() => {
-    const n = Number(url.searchParams.get('limit') ?? '50') || 50;
+    const n = Number(url.searchParams.get('limit') ?? '25') || 25;
     return Math.max(1, Math.min(100, n));
   })();
   const sort = (url.searchParams.get('sort') ?? 'score_desc') as 'score_desc' | 'score_asc' | 'time_desc' | 'time_asc';
@@ -44,7 +44,6 @@ export async function GET(request: NextRequest) {
   const rows = await db
     .select({
       id: entriesTable.id,
-      imageDataUrl: entriesTable.imageDataUrl,
       score: entriesTable.score,
       matchedKeywords: entriesTable.matchedKeywords,
       createdAt: entriesTable.createdAt,
@@ -61,6 +60,7 @@ export async function GET(request: NextRequest) {
     success: true,
     entries: rows.map((r) => ({
       ...r,
+      imageId: r.id,
       matchedKeywords: r.matchedKeywords?.split(',').filter(Boolean) ?? [],
       createdAt: r.createdAt?.toISOString?.() ?? new Date().toISOString(),
       socialPlatform: r.socialPlatform ?? null,
