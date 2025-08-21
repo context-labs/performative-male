@@ -6,7 +6,7 @@ import Image from "next/image";
 export function PartnerBanner() {
   return (
     <Link
-      href="https://inference.net/blog/cliptagger-12b"
+      href="https://inference.net/blog/cliptagger-12b?utm_source=performative-male-ai"
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Read the Grass × Inference launch blog"
