@@ -1,160 +1,95 @@
-## ClipTagger Demo
+## Performative Male AI (Leaderboard app)
 
-ClipTagger Demo is a Next.js app that annotates images and video keyframes using the `inference-net/cliptagger-12b` model via the Inference.net Chat Completions API. It lets you:
-
-- Upload a single image for annotation
-- Drop a short video to extract 5 representative frames client‑side and annotate each
-- View strict JSON output with timing/attempt metadata
-- Copy ready‑to‑use API code samples (cURL, TypeScript, Python)
-
-The server route keeps your API key on the server and returns only the model output to the client.
+This is a Next.js app that scores uploaded photos for “performativity” and features a public leaderboard. Users can opt in to publish their score, keywords, and an optional social handle. Images are stored in the DB as data URLs but served via cacheable routes, not embedded directly in pages.
 
 ---
 
 ## Quickstart
 
 ### Prerequisites
-- Node.js 18+ (recommended 20+)
-- A package manager (pnpm, npm, or yarn)
-- Inference.net API key
+- Node.js 18+ (20+ recommended)
+- pnpm
+- Env vars: `INFERENCE_API_KEY`, `DATABASE_URL`
 
-### 1) Install dependencies
+### Install
 ```bash
 pnpm install
-# or
-npm install
 ```
 
-Avoid having multiple lockfiles in the project to prevent install/build warnings. Use a single tool consistently.
+Avoid multiple lockfiles. Use pnpm consistently.
 
-### 2) Configure environment
-Create a `.env` file in the project root:
-```bash
-INFERENCE_API_KEY=YOUR_API_KEY_HERE
+### Environment
+Create `.env` in project root:
+```
+INFERENCE_API_KEY=sk-...
+DATABASE_URL=postgres://... (Neon)
 ```
 
-### 3) Run the app
+### Run
 ```bash
 pnpm dev
-# or
-npm run dev
 ```
-
-Visit http://localhost:3000 and try uploading an image or a video.
-
-### 4) Production build
-```bash
-pnpm build && pnpm start
-# or
-npm run build && npm start
-```
+Open http://localhost:3000
 
 ---
 
 ## How it works
-
-- UI: `app/page.tsx` provides the image flow; `components/VideoAnnotator.tsx` extracts 5 frames from a dropped video and invokes the same API per frame.
-- Server: `app/api/annotate/route.ts` calls Inference.net’s Chat Completions endpoint with a strict prompt and returns parsed JSON.
-- Prompts: `lib/prompts.ts` contains the system and user prompts that shape the response.
-- Code samples: `components/CodeModal.tsx` + `lib/code-snippets/*` show how to call the upstream API directly (cURL, TS, Python).
-
-Key model: `inference-net/cliptagger-12b`
+- UI: `app/page.tsx` handles upload, scoring, and submission with a leaderboard opt‑in (default true).
+- Scoring: `app/api/annotate/route.ts` calls Inference.net (`inference-net/cliptagger-12b`) and returns structured JSON.
+- Leaderboard: `app/leaderboard/page.tsx` is a Server Component that streams a shell and renders `components/LeaderboardContent.tsx` with cached top entries (limit 25).
+- Image delivery: images are retrieved via `/img/[id]` → redirects to `/img/[id]/[hash]` with strong caching/ETag.
+- DB: Neon + Drizzle (`src/db.ts`, `src/schema.ts`).
 
 ---
 
 ## API
 
 ### POST /api/annotate
-Accepts a base64 data URL for an image and returns structured JSON.
+Scores a base64 data URL image using the upstream model.
 
-Request body:
+Request
+```json
+{ "imageDataUrl": "data:image/png;base64,AAAA..." }
+```
+
+Response (shape)
+```json
+{ "success": true, "result": { "description": "...", "objects": ["..."], "summary": "..." }, "timings": { "totalMs": 0 } }
+```
+
+### POST /api/submit
+Saves a scored entry to the leaderboard (deduplicates by image hash or data URL).
+
+Body
 ```json
 {
-  "imageDataUrl": "data:image/png;base64,AAAA..."
+  "imageDataUrl": "data:image/png;base64,AAAA...",
+  "socialPlatform": "twitter|instagram|tiktok",
+  "socialHandle": "handle",
+  "leaderboardOptIn": true
 }
 ```
 
-Successful response (shape):
-```json
-{
-  "success": true,
-  "result": {
-    "description": "...",
-    "objects": ["..."],
-    "actions": ["..."],
-    "environment": "...",
-    "content_type": "...",
-    "specific_style": "...",
-    "production_quality": "...",
-    "summary": "...",
-    "logos": ["..."]
-  },
-  "usage": {},
-  "upstreamStatus": 200,
-  "attempts": 1,
-  "timings": { "upstreamMs": 0, "totalMs": 0 }
-}
-```
+Response includes: `id`, `score`, `matchedKeywords`, timestamps, and social fields.
 
-Error response (example):
-```json
-{
-  "error": "Missing INFERENCE_API_KEY server environment variable"
-}
-```
+### GET /api/leaderboard
+Returns top entries (default limit 25), filterable.
 
-Test locally with cURL:
-```bash
-curl -X POST http://localhost:3000/api/annotate \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "imageDataUrl": "data:image/png;base64,AAAA..."
-  }'
-```
-
-Security note: the server route reads `INFERENCE_API_KEY` from the server environment and never exposes it to the browser.
+Query params: `minScore`, `limit`, `sort`, `q`, `maleOnly` (default true)
 
 ---
 
-## Direct API usage (optional)
-If you prefer to call Inference.net directly from your own backend, see:
-- `lib/code-snippets/curl-code.ts`
-- `lib/code-snippets/ts-code.ts`
-- `lib/code-snippets/python-code.ts`
+## Image routes
+- `GET /img/[id]` → 302 to `/img/[id]/[hash]` and sets cache headers.
+- `GET /img/[id]/[hash]` → serves bytes with `ETag`, long-lived immutable cache, and content type inferred from data URL.
 
-These examples target `https://api.inference.net/v1/chat/completions` with the `inference-net/cliptagger-12b` model and a strict JSON response format.
+Use these URLs in the UI, e.g. `/img/123?w=256&fmt=webp&q=70` (query params are ignored by the server and can be used for client hints/CDN transforms).
 
 ---
 
-## UI notes
-- Image upload accepts JPEG/PNG/WebP/GIF (client limit ~4.5MB).
-- Video workflow extracts 5 uniformly spaced frames client‑side and annotates each independently.
-- Result JSON is syntax‑highlighted and accompanied by timing/attempt metadata.
-
-You can change the number of video frames by editing `NUM_FRAMES` in `components/VideoAnnotator.tsx`.
-
----
-
-## Tech stack
-- Next.js 15, React 19
-- Tailwind CSS 4
-- Radix UI (Dialog, Tabs)
-- lucide-react icons
-- highlight.js for code/JSON display
-
----
-
-## Troubleshooting
-- 500 from `/api/annotate`: ensure `INFERENCE_API_KEY` is set server‑side.
-- Install/build warning about multiple lockfiles: use a single package manager and delete extra lockfiles.
-- Slow or inconsistent upstream responses: the server implements basic retries with backoff; try again or check your network/API quota.
-
----
-
-## Deploy
-On platforms like Vercel:
-1. Set `INFERENCE_API_KEY` in your project’s environment variables.
-2. Deploy as usual; the app uses Node.js runtime for the API route and does not expose your key to the client.
+## Dev notes
+- Only pnpm is used in this repo.
+- The leaderboard Server Component caches only lightweight metadata; image bytes are fetched separately to avoid exceeding Next.js data cache limits.
 
 ---
 

@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     title: "Performative Male Detector: An AI Vibe Check",
     description:
       "Is he trying too hard? Upload a photo and our AI will score his performativity. Tote bags, iced coffee, and ironic t-shirts welcome.",
-    images: ["https://cliptagger.inference.net/og.png"],
+    images: ["https://performative.inference.net/og.png"],
   },
   metadataBase: new URL("https://performative.inference.net"),
 };
